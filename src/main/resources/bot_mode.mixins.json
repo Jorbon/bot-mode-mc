@@ -3,8 +3,8 @@
     "package": "${maven_group}.${project_id}.mixin",
     "compatibilityLevel": "JAVA_${java_version}",
     "client": [
-        "CameraMixin",
-        "ClientPlayerEntityMixin"
+        "ClientPlayerEntityMixin",
+        "KeyboardInputMixin"
     ],
     "injectors": {
         "defaultRequire": 1

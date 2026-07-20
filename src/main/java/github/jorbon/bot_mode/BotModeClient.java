@@ -16,7 +16,6 @@ public class BotModeClient implements ClientModInitializer {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (key_run.wasPressed()) {
                 BotModeClient.bot_mode = true;
-                System.out.println("Run key pressed!");
             }
         });
     }
