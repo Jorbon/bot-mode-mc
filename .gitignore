@@ -1,0 +1,6 @@
+.gradle/
+build/
+bin/
+run/
+local_maven/
+gradle/wrapper/

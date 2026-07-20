@@ -1,0 +1,38 @@
+{
+    "schemaVersion": 1,
+    "id": "${project_id}",
+    "version": "${version}",
+    
+    "name": "Bot Mode",
+    "description": "Utilities for automating monotonous, large-scale tasks",
+    "authors": [
+        "Jorbonism"
+    ],
+    "contact": {
+        "homepage": "",
+        "sources": "https://github.com/Jorbon/bot-mode-mc"
+    },
+    
+    "license": "GPL-3.0",
+    "icon": "assets/bot_mode/icon.png",
+    
+    "environment": "client",
+    "entrypoints": {
+        "client": [
+            "github.jorbon.bot_mode.BotModeClient"
+        ]
+    },
+    "mixins": [
+        {
+            "config": "bot_mode.mixins.json",
+            "environment": "client"
+        }
+    ],
+    
+    "depends": {
+        "java": ">=${java_version}",
+        "minecraft": ${minecraft_compatible_range},
+        "fabricloader": "*",
+        "fabric-api": "*"
+    }
+}
