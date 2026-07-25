@@ -5,13 +5,11 @@ import com.mojang.authlib.GameProfile;
 import github.jorbon.bot_mode.BotModeClient;
 
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.input.Input;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.network.ClientPlayNetworkHandler;
 import net.minecraft.client.network.ClientPlayerEntity;
@@ -30,12 +28,6 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
         BotModeClient.bot_mode = false;
     }
     
-    @Inject(at = @At("HEAD"), method = "tick")
-	public void tick(CallbackInfo ci) {
-        if (!BotModeClient.bot_mode) return;
-        super.changeLookDirection(5.0d, 0.0d);
-    }
-    
     @Override
     public void changeLookDirection(double cursorDeltaX, double cursorDeltaY) {
         if (!BotModeClient.bot_mode) {
@@ -43,5 +35,4 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
         }
     }
     
-    @Shadow public Input input = new Input();
 }

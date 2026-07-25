@@ -4,7 +4,8 @@
     "compatibilityLevel": "JAVA_${java_version}",
     "client": [
         "ClientPlayerEntityMixin",
-        "KeyboardInputMixin"
+        "KeyboardInputMixin",
+        "MinecraftClientMixin"
     ],
     "injectors": {
         "defaultRequire": 1
