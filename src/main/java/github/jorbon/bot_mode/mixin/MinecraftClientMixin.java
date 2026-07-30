@@ -14,6 +14,7 @@ import net.minecraft.client.WindowEventHandler;
 import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.GameOptions;
 import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.Pair;
 import net.minecraft.util.thread.ReentrantThreadExecutor;
 
 @Mixin(MinecraftClient.class)
@@ -27,9 +28,19 @@ public abstract class MinecraftClientMixin extends ReentrantThreadExecutor<Runna
             return;
         }
         
-        var breaking = BotModeClient.bot_mode_do();
+        Pair<Boolean, Boolean> pair = BotModeClient.bot_mode_do_before_interact();
+        var breaking = pair.getLeft();
+        var attacking = pair.getRight();
+        
+        if (attacking && !this.player.isUsingItem()) {
+            if (this.doAttack()) {
+                breaking = false;
+            }
+        }
         this.attackCooldown = 0;
         this.handleBlockBreaking(breaking);
+        
+        BotModeClient.bot_mode_do_after_interact();
     }
     
     @Inject(method = "handleInputEvents", at = @At("HEAD"))
@@ -51,6 +62,7 @@ public abstract class MinecraftClientMixin extends ReentrantThreadExecutor<Runna
     @Shadow @Nullable public ClientWorld world;
     @Shadow public int attackCooldown;
     @Shadow private void handleBlockBreaking(boolean breaking) {}
+    @Shadow private boolean doAttack() { return false; }
     
     
     MinecraftClientMixin(GameOptions options) {
