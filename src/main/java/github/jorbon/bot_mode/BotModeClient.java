@@ -332,6 +332,7 @@ public class BotModeClient implements ClientModInitializer {
                 return;
             }
             if (search_distance > 5) {
+                search_distance = 0;
                 return;
             }
         }
