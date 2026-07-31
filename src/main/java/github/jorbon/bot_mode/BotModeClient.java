@@ -332,6 +332,7 @@ public class BotModeClient implements ClientModInitializer {
                 return;
             }
             if (search_distance > 5) {
+                search_distance = 0;
                 return;
             }
         }
@@ -475,7 +476,7 @@ public class BotModeClient implements ClientModInitializer {
             )) {
                 var item = item_entity.getStack().getItem();
                 double distance = item_entity.getEntityPos().distanceTo(pos);
-                if ((best == null || best_distance < distance) && (item == Items.ANCIENT_DEBRIS || item == Items.QUARTZ)) {
+                if ((best == null || best_distance > distance) && (item == Items.ANCIENT_DEBRIS || item == Items.QUARTZ)) {
                     best = item_entity;
                     best_distance = distance;
                 }
@@ -555,7 +556,7 @@ public class BotModeClient implements ClientModInitializer {
                 var x = (int) Math.floor(pair.getLeft () + v.x * 0.8);
                 var z = (int) Math.floor(pair.getRight() + v.z * 0.8);
                 
-                var danger_level = danger_blocks.get(new BlockPos(x, 16, z));
+                var danger_level = danger_blocks.getOrDefault(new BlockPos(x, 16, z), 0);
                 if (danger_level >= 2) {
                     continue outer;
                 }
