@@ -32,10 +32,11 @@ public abstract class KeyboardInputMixin extends Input {
             return;
         }
         
-        this.movementVector = new Vec2f(
+        Vec2f vec = new Vec2f(
             getMovementMultiplier(this.playerInput.left(), this.playerInput.right()),
             getMovementMultiplier(this.playerInput.forward(), this.playerInput.backward())
-        ).normalize();
+        );
+        this.movementVector = (vec.x != 0.0f || vec.y != 0.0f) ? vec.normalize() : vec;
         
         ci.cancel();
     }
