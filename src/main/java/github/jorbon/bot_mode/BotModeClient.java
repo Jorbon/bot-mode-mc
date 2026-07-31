@@ -42,7 +42,8 @@ public class BotModeClient implements ClientModInitializer {
     public static boolean bot_mode = false;
     
     private static final KeyBinding.Category BOT_MODE_CATEGORY = KeyBinding.Category.create(Identifier.of("bot_mode"));
-    private static KeyBinding key_run = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bot_mode.run", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, BOT_MODE_CATEGORY));
+    private static KeyBinding key_run  = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bot_mode.run" , InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, BOT_MODE_CATEGORY));
+    private static KeyBinding key_back = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bot_mode.back", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, BOT_MODE_CATEGORY));
     
     public static int target_importance;
     public static int search_distance;
@@ -62,6 +63,10 @@ public class BotModeClient implements ClientModInitializer {
                 attack_cooldown = 0;
                 entity_target = null;
                 danger_blocks.clear();
+            }
+            while (key_back.wasPressed()) {
+                bot_mode = false;
+                MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("back");
             }
         });
     }
@@ -109,7 +114,7 @@ public class BotModeClient implements ClientModInitializer {
                 if (value == 0) {
                     // Missing floor blocks
                     var floor_block_pos = new BlockPos(x, 14, z);
-                    if (!world.getBlockState(floor_block_pos).isSolidSurface(world, floor_block_pos, player, Direction.UP)) {
+                    if (world.getBlockState(floor_block_pos).isAir()) {
                         value = 1;
                     }
                 }

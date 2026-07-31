@@ -1,4 +1,5 @@
 {
-    "key.category.minecraft.bot_mode":"Bot Mode",
-    "key.bot_mode.run":"Bot mode"
+    "key.category.minecraft.bot_mode": "Bot Mode",
+    "key.bot_mode.run": "Bot mode",
+    "key.bot_mode.back": "Back"
 }
