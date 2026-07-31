@@ -476,7 +476,7 @@ public class BotModeClient implements ClientModInitializer {
             )) {
                 var item = item_entity.getStack().getItem();
                 double distance = item_entity.getEntityPos().distanceTo(pos);
-                if ((best == null || best_distance < distance) && (item == Items.ANCIENT_DEBRIS || item == Items.QUARTZ)) {
+                if ((best == null || best_distance > distance) && (item == Items.ANCIENT_DEBRIS || item == Items.QUARTZ)) {
                     best = item_entity;
                     best_distance = distance;
                 }
