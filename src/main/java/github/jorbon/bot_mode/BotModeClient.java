@@ -79,12 +79,13 @@ public class BotModeClient implements ClientModInitializer {
                 if (dimension_key.isPresent()) {
                     var path = dimension_key.get().getValue().getPath();
                     switch (path) {
-                        case "the_nether" -> bot_mode = Mode.MAIN;
-                        case "the_end"    -> bot_mode = Mode.END ;
-                        default           -> bot_mode = Mode.OFF ;
+                        case "the_nether" -> bot_mode = Mode.MAIN  ;
+                        case "the_end"    -> bot_mode = Mode.END   ;
+                        case "overworld"  -> bot_mode = Mode.REPAIR;
+                        default           -> bot_mode = Mode.OFF   ;
                     }
                 }
-                // bot_mode = true;
+                
                 block_target = null;
                 target_importance = 0;
                 search_distance = 0;
@@ -92,6 +93,7 @@ public class BotModeClient implements ClientModInitializer {
                 entity_target = null;
                 danger_blocks.clear();
             }
+            
             while (key_back.wasPressed()) {
                 bot_mode = Mode.OFF;
                 MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("back");

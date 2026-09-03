@@ -27,7 +27,7 @@ public abstract class MinecraftClientMixin extends ReentrantThreadExecutor<Runna
     public void tick(CallbackInfo ci) {
         if (BotModeClient.bot_mode == BotModeClient.Mode.OFF) return;
         if (this.player == null || this.world == null) {
-            BotModeClient.bot_mode = BotModeClient.Mode.OFF;
+            // BotModeClient.bot_mode = BotModeClient.Mode.OFF;
             return;
         }
         
