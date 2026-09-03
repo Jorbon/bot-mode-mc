@@ -103,7 +103,6 @@ public class BotModeClient implements ClientModInitializer {
     
     static void bail() {
         MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("home");
-        // MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("gamemode creative");
         bot_mode = Mode.OFF;
     }
     

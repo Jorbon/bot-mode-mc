@@ -25,7 +25,7 @@ public abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity
     
     @Inject(at = @At("RETURN"), method = "<init>(Lnet/minecraft/client/MinecraftClient;Lnet/minecraft/client/world/ClientWorld;Lnet/minecraft/client/network/ClientPlayNetworkHandler;Lnet/minecraft/stat/StatHandler;Lnet/minecraft/client/recipebook/ClientRecipeBook;Lnet/minecraft/util/PlayerInput;Z)V")
     public void init(MinecraftClient client, ClientWorld world, ClientPlayNetworkHandler networkHandler, StatHandler stats, ClientRecipeBook recipeBook, PlayerInput lastPlayerInput, boolean lastSprinting, CallbackInfo ci) {
-        BotModeClient.bot_mode = BotModeClient.Mode.OFF;
+        // BotModeClient.bot_mode = BotModeClient.Mode.OFF;
     }
     
     @Override
