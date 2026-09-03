@@ -46,21 +46,13 @@ processResources {
     inputs.property "java_version", project.java_version
     inputs.property "minecraft_compatible_range", Boolean.parseBoolean("${project.enforce_range}") ? project.minecraft_compatible_range : "\"*\""
     
-    filesMatching("fabric.mod.json") {
+    filesMatching("*.json") {
         expand (
             maven_group: inputs.properties.maven_group,
             project_id: inputs.properties.project_id,
             version: inputs.properties.version,
             java_version: inputs.properties.java_version,
             minecraft_compatible_range: inputs.properties.minecraft_compatible_range,
-        )
-    }
-    
-    filesMatching("*.mixins.json") {
-        expand (
-            maven_group: inputs.properties.maven_group,
-            project_id: inputs.properties.project_id,
-            java_version: JavaVersion.toVersion(project.java_version).toString().replace(".", "_"),
         )
     }
 }

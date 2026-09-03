@@ -17,7 +17,7 @@ public abstract class KeyboardInputMixin extends Input {
     
     @Inject(at = @At("HEAD"), cancellable = true, method = "tick")
     public void tick(CallbackInfo ci) {
-        if (!BotModeClient.bot_mode) return;
+        if (BotModeClient.bot_mode == BotModeClient.Mode.OFF) return;
         
         if (
             this.settings.forwardKey.isPressed() || 
@@ -28,7 +28,7 @@ public abstract class KeyboardInputMixin extends Input {
             this.settings.sneakKey  .isPressed() || 
             this.settings.sprintKey .isPressed()
         ) {
-            BotModeClient.bot_mode = false;
+            BotModeClient.bot_mode = BotModeClient.Mode.OFF;
             return;
         }
         

@@ -6,23 +6,35 @@ import java.util.List;
 
 import org.lwjgl.glfw.GLFW;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.block.Blocks;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.command.argument.EntityAnchorArgumentType.EntityAnchor;
 import net.minecraft.entity.FallingBlockEntity;
 import net.minecraft.entity.ItemEntity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.mob.EndermanEntity;
+import net.minecraft.entity.mob.GhastEntity;
 import net.minecraft.entity.mob.HoglinEntity;
 import net.minecraft.entity.mob.MagmaCubeEntity;
 import net.minecraft.entity.mob.PiglinEntity;
 import net.minecraft.entity.mob.SkeletonEntity;
+import net.minecraft.entity.player.PlayerInventory;
 import net.minecraft.fluid.Fluids;
+import net.minecraft.item.Item;
 import net.minecraft.item.Items;
+import net.minecraft.network.packet.c2s.play.ClickSlotC2SPacket;
+import net.minecraft.registry.tag.BlockTags;
+import net.minecraft.registry.tag.ItemTags;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.screen.slot.SlotActionType;
+import net.minecraft.screen.sync.ItemStackHash;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.Pair;
 import net.minecraft.util.PlayerInput;
@@ -39,7 +51,14 @@ import net.minecraft.util.math.Vec3i;
 
 public class BotModeClient implements ClientModInitializer {
     
-    public static boolean bot_mode = false;
+    public enum Mode {
+        OFF   ,
+        MAIN  ,
+        REPAIR,
+        END   ;
+    }
+    
+    public static Mode bot_mode = Mode.OFF;
     
     private static final KeyBinding.Category BOT_MODE_CATEGORY = KeyBinding.Category.create(Identifier.of("bot_mode"));
     private static KeyBinding key_run  = KeyBindingHelper.registerKeyBinding(new KeyBinding("key.bot_mode.run" , InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, BOT_MODE_CATEGORY));
@@ -54,9 +73,18 @@ public class BotModeClient implements ClientModInitializer {
     
     @Override
     public void onInitializeClient() {
-        ClientTickEvents.END_CLIENT_TICK.register(c -> {
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (key_run.wasPressed()) {
-                bot_mode = true;
+                var dimension_key = client.player.getEntityWorld().getDimensionEntry().getKey();
+                if (dimension_key.isPresent()) {
+                    var path = dimension_key.get().getValue().getPath();
+                    switch (path) {
+                        case "the_nether" -> bot_mode = Mode.MAIN;
+                        case "the_end"    -> bot_mode = Mode.END ;
+                        default           -> bot_mode = Mode.OFF ;
+                    }
+                }
+                // bot_mode = true;
                 block_target = null;
                 target_importance = 0;
                 search_distance = 0;
@@ -65,7 +93,7 @@ public class BotModeClient implements ClientModInitializer {
                 danger_blocks.clear();
             }
             while (key_back.wasPressed()) {
-                bot_mode = false;
+                bot_mode = Mode.OFF;
                 MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("back");
             }
         });
@@ -74,7 +102,7 @@ public class BotModeClient implements ClientModInitializer {
     static void bail() {
         MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("home");
         // MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("gamemode creative");
-        bot_mode = false;
+        bot_mode = Mode.OFF;
     }
     
     static boolean handle_danger() {
@@ -237,8 +265,17 @@ public class BotModeClient implements ClientModInitializer {
         double min_distance = Double.MAX_VALUE;
         for (var entity : world.getEntitiesByType(
             TypeFilter.instanceOf(LivingEntity.class),
-            new Box(player_block_pos.getX() - 32, 14, player_block_pos.getZ() - 32, player_block_pos.getX() + 32, 18, player_block_pos.getZ() + 32),
-            entity -> entity.isAlive() && ((entity instanceof PiglinEntity && !entity.isBaby()) || entity instanceof SkeletonEntity || entity instanceof HoglinEntity || entity instanceof MagmaCubeEntity)
+            new Box(player_block_pos.getX() - 16, 14, player_block_pos.getZ() - 16, player_block_pos.getX() + 16, 18, player_block_pos.getZ() + 16),
+            entity -> (
+                entity.getEntityPos().distanceTo(pos) < 16 && 
+                entity.isAlive() && (
+                    (entity instanceof PiglinEntity && !entity.isBaby()) || 
+                    entity instanceof SkeletonEntity || 
+                    entity instanceof HoglinEntity || 
+                    entity instanceof MagmaCubeEntity || 
+                    entity instanceof GhastEntity
+                )
+            )
         )) {
             var distance = entity.getEntityPos().distanceTo(pos);
             if (min_distance > distance) {
@@ -278,10 +315,10 @@ public class BotModeClient implements ClientModInitializer {
         java.util.Collections.shuffle(directions);
         
         while (true) {
-            for (var pair : directions) {
-                var v = pair.getLeft().multiply(search_distance);
-                var u = pair.getRight();
-                for (var a = 0; a <= search_distance; a++) {
+            for (var a = 0; a <= search_distance; a++) {
+                for (var pair : directions) {
+                    var v = pair.getLeft().multiply(search_distance);
+                    var u = pair.getRight();
                     var p = v.add(u.multiply(a));
                     
                     // Target block under lava, continuing to search even if a lower importance target exists
@@ -289,11 +326,11 @@ public class BotModeClient implements ClientModInitializer {
                     for (var y = 14; y <= 25; y++) {
                         var block_pos = new BlockPos(player_block_pos.getX() + p.getX(), y, player_block_pos.getZ() + p.getZ());
                         var block = world.getBlockState(block_pos);
-                        var biome = world.getBiome(block_pos);
+                        // var biome = world.getBiome(block_pos);
                         
                         if (!block.isAir() && block.getFluidState().isEmpty()) {
                             if (y >= 18) break;
-                            if (!(biome.matchesId(Identifier.ofVanilla("crimson_forest")) || biome.matchesId(Identifier.ofVanilla("basalt_deltas")))) {
+                            // if (!(biome.matchesId(Identifier.ofVanilla("crimson_forest")) || biome.matchesId(Identifier.ofVanilla("basalt_deltas")))) {
                                 top_block_pos_under_lava = null;
                                 for (var direction : List.of(Direction.EAST, Direction.WEST, Direction.NORTH, Direction.SOUTH)) {
                                     if (world.getBlockState(block_pos.up().offset(direction)).isAir()) {
@@ -301,7 +338,7 @@ public class BotModeClient implements ClientModInitializer {
                                         break;
                                     }
                                 }
-                            }
+                            // }
                         }
                         
                         if (!block.getFluidState().isEmpty() && top_block_pos_under_lava != null) {
@@ -326,6 +363,7 @@ public class BotModeClient implements ClientModInitializer {
                     }
                 }
             }
+            
             search_distance += 1;
             if (target_importance == 1 && search_distance > 2 + Math.max(Math.abs(player_block_pos.getX() - block_target.getX()), Math.abs(player_block_pos.getZ() - block_target.getZ()))) {
                 search_distance = 0;
@@ -337,7 +375,41 @@ public class BotModeClient implements ClientModInitializer {
         }
     }
     
-    public static Pair<Boolean, Boolean> bot_mode_do_before_interact() {
+    public static void drop_stack(ClientPlayerEntity player, int slot) {
+        var inventory = player.getInventory();
+        var item_stack = inventory.getStack(slot);
+        if (item_stack.isEmpty()) return;
+        
+        inventory.removeStack(slot, item_stack.getCount());
+        Int2ObjectMap<ItemStackHash> int2ObjectMap = new Int2ObjectOpenHashMap<>();
+        int2ObjectMap.put(slot, ItemStackHash.fromItemStack(item_stack, player.networkHandler.getComponentHasher()));
+        player.networkHandler.sendPacket(new ClickSlotC2SPacket(
+            0, player.currentScreenHandler.getRevision(), (short) slot, (byte) 1, SlotActionType.THROW, int2ObjectMap, ItemStackHash.EMPTY
+        ));
+    }
+    
+    
+    public static class InteractState {
+        public final boolean breaking ;
+        public final boolean attacking;
+        public final boolean using    ;
+        public final boolean holding  ;
+        
+        static final InteractState NONE      = new InteractState(false, false, false, false);
+        static final InteractState BREAKING  = new InteractState(true , false, false, false);
+        static final InteractState ATTACKING = new InteractState(false, true , false, false);
+        static final InteractState USING     = new InteractState(false, false, true , false);
+        static final InteractState HOLDING   = new InteractState(false, false, false, true );
+        
+        public InteractState(boolean breaking, boolean attacking, boolean using, boolean holding) {
+            this.breaking  = breaking ;
+            this.attacking = attacking;
+            this.using     = using    ;
+            this.holding   = holding  ;
+        }
+    }
+    
+    public static InteractState bot_mode_do_before_interact() {
         if (attack_cooldown > 0) attack_cooldown -= 1;
         
         var client = MinecraftClient.getInstance();
@@ -348,31 +420,138 @@ public class BotModeClient implements ClientModInitializer {
         var inventory = player.getInventory();
         
         
+        if (bot_mode == Mode.END) {
+            var pos = player.getEntityPos();
+            
+            entity_target = null;
+            double min_distance = Double.MAX_VALUE;
+            for (var entity : world.getEntitiesByType(
+                TypeFilter.instanceOf(LivingEntity.class),
+                new Box(
+                    player_block_pos.getX() - 5,
+                    player_block_pos.getY() - 5,
+                    player_block_pos.getZ() - 5,
+                    player_block_pos.getX() + 5,
+                    player_block_pos.getY() + 5,
+                    player_block_pos.getZ() + 5
+                ),
+                entity -> (
+                    entity.getEntityPos().distanceTo(pos) < 16 && 
+                    entity.isAlive() && entity instanceof EndermanEntity
+                )
+            )) {
+                var distance = entity.getEntityPos().distanceTo(pos);
+                if (min_distance > distance) {
+                    min_distance = distance;
+                    entity_target = entity;
+                }
+            }
+            
+            if (entity_target != null) {
+                player.lookAt(EntityAnchor.EYES, entity_target.getEntityPos().add(0.0, 1.0, 0.0));
+                if (player.getInventory().getSelectedSlot() != 0) {
+                    player.getInventory().setSelectedSlot(0);
+                    attack_cooldown = 10;
+                    
+                } else if (
+                    attack_cooldown == 0 && 
+                    crosshairTarget.getType() == Type.ENTITY && 
+                    crosshairTarget instanceof EntityHitResult result && 
+                    result.getEntity() instanceof EndermanEntity && 
+                    !player.isUsingItem()
+                ) {
+                    attack_cooldown = 10;
+                    return InteractState.ATTACKING;
+                }
+            }
+            
+            return InteractState.NONE;
+            
+        } else if (bot_mode == Mode.REPAIR) {
+            
+            if (player.getHungerManager().getFoodLevel() <= 12) {
+                inventory.setSelectedSlot(8);
+                return InteractState.HOLDING;
+            }
+            
+            if (player.totalExperience == 0) {
+                bot_mode = Mode.OFF;
+                return InteractState.NONE;
+            }
+            
+            for (var tag : List.of(
+                ItemTags.SWORDS,
+                ItemTags.PICKAXES,
+                ItemTags.SHOVELS,
+                ItemTags.AXES
+            )) {
+                for (var i = 0; i < PlayerInventory.HOTBAR_SIZE; i++) {
+                    var stack = inventory.getStack(i);
+                    if (stack.isIn(tag)) {
+                        if (stack.getDamage() == 0) {
+                            continue;
+                        }
+                        
+                        inventory.setSelectedSlot(i);
+                        return InteractState.HOLDING;
+                    }
+                }
+            }
+            
+            bot_mode = Mode.MAIN;
+            MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("back");
+            return InteractState.NONE;
+        }
+        
         
         if (player.getHealth() < 8.0 || player_block_pos.getY() < 14 || player_block_pos.getY() > 17) {
             bail();
-            return new Pair<>(false, false);
+            return InteractState.NONE;
         }
+        
+        if (player.getHungerManager().getFoodLevel() <= 12 || inventory.getSelectedStack().getDamage() > 1500) {
+            bot_mode = Mode.REPAIR;
+            MinecraftClient.getInstance().getNetworkHandler().sendChatCommand("home");
+            return InteractState.NONE;
+        }
+        
         
         choose_entity_target();
         choose_mining_target();
         
         if (entity_target != null && target_importance < 2) {
-            var attacking = false;
             player.lookAt(EntityAnchor.EYES, entity_target.getEyePos());
-            if (player.getInventory().getSelectedSlot() != 0) {
-                player.getInventory().setSelectedSlot(0);
-                attack_cooldown = 10;
-            }
-            if (attack_cooldown == 0 && crosshairTarget.getType() == Type.ENTITY && crosshairTarget instanceof EntityHitResult result) {
-                if (result.getEntity() == entity_target && !player.isUsingItem()) {
-                    attacking = true;
-                    attack_cooldown = 10;
+            for (var i = 0; i < PlayerInventory.HOTBAR_SIZE; i++) {
+                if (inventory.getStack(i).isIn(ItemTags.SWORDS)) {
+                    if (inventory.getSelectedSlot() != i) {
+                        inventory.setSelectedSlot(i);
+                        attack_cooldown = 10;
+                    }
+                    break;
                 }
             }
-            target_importance = 0;
-            search_distance = 0;
-            return new Pair<>(false, attacking);
+            
+            if (
+                attack_cooldown == 0 && 
+                crosshairTarget.getType() == Type.ENTITY && 
+                crosshairTarget instanceof EntityHitResult result && 
+                result.getEntity() == entity_target && 
+                !player.isUsingItem()
+            ) {
+                attack_cooldown = 10;
+                target_importance = 0;
+                search_distance = 0;
+                return InteractState.ATTACKING;
+                
+            } else {
+                if (target_importance > 0 && block_target.toCenterPos().distanceTo(player.getEyePos()) < 1.7) {
+                    // Fall through to mining routine
+                } else {
+                    target_importance = 0;
+                    search_distance = 0;
+                    return InteractState.NONE;
+                }
+            }
         }
         
         if (target_importance > 0) {
@@ -389,48 +568,88 @@ public class BotModeClient implements ClientModInitializer {
             if (crosshairTarget != null) {
                 if (crosshairTarget.getType() == HitResult.Type.BLOCK && crosshairTarget instanceof BlockHitResult result) {
                     var result_pos = result.getBlockPos();
-                    var result_block = world.getBlockState(result_pos).getBlock();
+                    var block_state = world.getBlockState(result_pos);
+                    // var result_block = .getBlock();
                     var biome = world.getBiome(result_pos);
-                    if (((result_pos.equals(block_target)) || result_pos.getY() >= 15 && result_pos.getY() <= 17) && !(biome.matchesId(Identifier.ofVanilla("crimson_forest")) || biome.matchesId(Identifier.ofVanilla("basalt_deltas")))) {
-                        if (
-                            result_block == Blocks.SOUL_SAND || 
-                            result_block == Blocks.SOUL_SOIL || 
-                            result_block == Blocks.GRAVEL
-                        ) {
-                            inventory.setSelectedSlot(2);
-                        } else {
-                            inventory.setSelectedSlot(1);
+                    if (
+                        result_pos.equals(block_target) || (
+                            result_pos.getY() >= 15 && result_pos.getY() <= 17 && !(
+                                biome.matchesId(Identifier.ofVanilla("crimson_forest")) || 
+                                biome.matchesId(Identifier.ofVanilla("basalt_deltas"))
+                            )
+                        )
+                    ) {
+                        TagKey<Item> tool_tag = null;
+                        if (block_state.isIn(BlockTags.PICKAXE_MINEABLE)) {
+                            tool_tag = ItemTags.PICKAXES;
+                        } else if (block_state.isIn(BlockTags.SHOVEL_MINEABLE)) {
+                            tool_tag = ItemTags.SHOVELS;
+                        } else if (block_state.isIn(BlockTags.AXE_MINEABLE)) {
+                            tool_tag = ItemTags.AXES;
                         }
+                        
+                        if (tool_tag != null) {
+                            for (var i = 0; i < PlayerInventory.HOTBAR_SIZE; i++) {
+                                if (inventory.getStack(i).isIn(tool_tag)) {
+                                    inventory.setSelectedSlot(i);
+                                }
+                            }
+                        }
+                        
                         breaking = true;
                     }
                 }
             }
             
-            return new Pair<>(breaking, false);
+            return new InteractState(breaking, false, false, false);
         }
         
-        return new Pair<>(false, false);
-        
-        // Drop:
-        // if (!this.player.isSpectator() && this.player.dropSelectedItem(drop_entire_stack)) {
-        //     this.player.swingHand(Hand.MAIN_HAND);
-        // }
-        
-        // Press right click:
-        // if (!this.player.isUsingItem()) {
-        //     this.doItemUse();
-        // }
-        
-        // Release right click:
-        // this.interactionManager.stopUsingItem(this.player);
+        return InteractState.NONE;
+    }
+    
+    public static boolean is_collection_goal(Item item) {
+        return (
+            item == Items.ANCIENT_DEBRIS || 
+            item == Items.QUARTZ         || 
+            item == Items.BLACKSTONE     || 
+            item == Items.GOLD_NUGGET    || 
+            item == Items.BASALT         || 
+            item == Items.NETHER_BRICKS  || 
+            item == Items.SOUL_SAND      || 
+            item == Items.SOUL_SOIL
+        );
+    }
+    
+    
+    public static boolean is_junk(Item item) {
+        return (
+            item == Items.NETHERRACK   || 
+            item == Items.GRAVEL       || 
+            item == Items.BONE         || 
+            item == Items.ARROW        || 
+            item == Items.BOW          || 
+            item == Items.LEATHER      || 
+            item == Items.GOLDEN_SWORD
+        );
     }
     
     public static void bot_mode_do_after_interact() {
         var client = MinecraftClient.getInstance();
         var player = client.player;
-        
         var pos = player.getEntityPos();
         var player_block_pos = player.getBlockPos();
+        var inventory = player.getInventory();
+        
+        
+        if (bot_mode == Mode.END) {
+            player.input.playerInput = PlayerInput.DEFAULT;
+            return;
+            
+        } else if (bot_mode == Mode.REPAIR) {
+            player.input.playerInput = new PlayerInput(false, false, false, false, false, true, false);
+            return;
+        }
+        
         
         if (handle_danger()) return;
         
@@ -441,6 +660,7 @@ public class BotModeClient implements ClientModInitializer {
         choose_mining_target();
         
         Vec3d movement_target = Vec3d.ZERO;
+        boolean sprint = false;
         
         if (target_importance >= 2) {
             movement_target = block_target.toCenterPos().subtract(pos);
@@ -453,6 +673,7 @@ public class BotModeClient implements ClientModInitializer {
             var distance = v.length();
             if (distance > 3.0) {
                 movement_target = v;
+                sprint = true;
             } else if (distance < 2.0) {
                 movement_target = v.negate();
             }
@@ -465,17 +686,17 @@ public class BotModeClient implements ClientModInitializer {
                 TypeFilter.instanceOf(ItemEntity.class),
                 new Box(
                     player_block_pos.getX() - 64,
-                    player_block_pos.getY() - 32,
+                    player_block_pos.getY() - 16,
                     player_block_pos.getZ() - 64,
                     player_block_pos.getX() + 64,
-                    player_block_pos.getY() + 32,
+                    player_block_pos.getY() + 16,
                     player_block_pos.getZ() + 64
                 ),
                 entity -> true
             )) {
                 var item = item_entity.getStack().getItem();
                 double distance = item_entity.getEntityPos().distanceTo(pos);
-                if ((best == null || best_distance < distance) && (item == Items.ANCIENT_DEBRIS || item == Items.QUARTZ)) {
+                if ((best == null || best_distance > distance) && is_collection_goal(item)) {
                     best = item_entity;
                     best_distance = distance;
                 }
@@ -484,6 +705,45 @@ public class BotModeClient implements ClientModInitializer {
             if (best != null) {
                 if (best_distance > 0.5) {
                     movement_target = best.getEntityPos().subtract(pos);
+                }
+                
+                var best_stack = best.getStack();
+                var items_to_fit = best_stack.getCount();
+                for (var slot = 0; slot < PlayerInventory.MAIN_SIZE; slot++) {
+                    var stack = inventory.getStack(slot);
+                    if (stack.isEmpty()) {
+                        items_to_fit = 0;
+                        break;
+                    }
+                    
+                    if (stack.getItem() == best_stack.getItem()) {
+                        var max_count = stack.getItem().getMaxCount();
+                        var existing_count = stack.getCount();
+                        if (existing_count + items_to_fit <= max_count) {
+                            items_to_fit = 0;
+                            break;
+                        } else {
+                            items_to_fit -= max_count - existing_count;
+                        }
+                    }
+                }
+                
+                if (items_to_fit > 0) {
+                    Integer junk_slot = null;
+                    for (var slot = 0; slot < PlayerInventory.MAIN_SIZE; slot++) {
+                        if (is_junk(inventory.getStack(slot).getItem())) {
+                            junk_slot = slot;
+                            break;
+                        }
+                    }
+                    
+                    if (junk_slot == null) {
+                        bail();
+                        return;
+                        
+                    } else {
+                        drop_stack(player, junk_slot);
+                    }
                 }
                 
             } else if (target_importance > 0) {
@@ -507,14 +767,14 @@ public class BotModeClient implements ClientModInitializer {
         var left = new Vec3d(look.z, 0.0, -look.x);
         
         var inputs = new ArrayList<>(List.of(
-            new PlayerInput(true , false, false, false, false, false, false),
-            new PlayerInput(true , false, true , false, false, false, false),
-            new PlayerInput(false, false, true , false, false, false, false),
-            new PlayerInput(false, true , true , false, false, false, false),
-            new PlayerInput(false, true , false, false, false, false, false),
-            new PlayerInput(false, true , false, true , false, false, false),
-            new PlayerInput(false, false, false, true , false, false, false),
-            new PlayerInput(true , false, false, true , false, false, false)
+            new PlayerInput(true , false, false, false, false, false, sprint),
+            new PlayerInput(true , false, true , false, false, false, sprint),
+            new PlayerInput(false, false, true , false, false, false, sprint),
+            new PlayerInput(false, true , true , false, false, false, sprint),
+            new PlayerInput(false, true , false, false, false, false, sprint),
+            new PlayerInput(false, true , false, true , false, false, sprint),
+            new PlayerInput(false, false, false, true , false, false, sprint),
+            new PlayerInput(true , false, false, true , false, false, sprint)
         ));
         
         final var movement_target_final = movement_target;
