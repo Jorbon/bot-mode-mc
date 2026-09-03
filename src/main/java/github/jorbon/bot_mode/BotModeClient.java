@@ -737,7 +737,7 @@ public class BotModeClient implements ClientModInitializer {
                 
                 if (items_to_fit > 0) {
                     Integer junk_slot = null;
-                    for (var slot = 0; slot < PlayerInventory.MAIN_SIZE; slot++) {
+                    for (var slot = PlayerInventory.MAIN_SIZE - 1; slot >= 0; slot--) {
                         if (is_junk(inventory.getStack(slot).getItem())) {
                             junk_slot = slot;
                             break;
