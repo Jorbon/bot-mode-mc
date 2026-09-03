@@ -381,10 +381,16 @@ public class BotModeClient implements ClientModInitializer {
         if (item_stack.isEmpty()) return;
         
         inventory.removeStack(slot, item_stack.getCount());
+        
+        int packet_slot = slot;
+        if (slot < 9) {
+            packet_slot += PlayerInventory.MAIN_SIZE;
+        }
+        
         Int2ObjectMap<ItemStackHash> int2ObjectMap = new Int2ObjectOpenHashMap<>();
-        int2ObjectMap.put(slot, ItemStackHash.fromItemStack(item_stack, player.networkHandler.getComponentHasher()));
+        int2ObjectMap.put(packet_slot, ItemStackHash.fromItemStack(item_stack, player.networkHandler.getComponentHasher()));
         player.networkHandler.sendPacket(new ClickSlotC2SPacket(
-            0, player.currentScreenHandler.getRevision(), (short) slot, (byte) 1, SlotActionType.THROW, int2ObjectMap, ItemStackHash.EMPTY
+            0, player.currentScreenHandler.getRevision(), (short) packet_slot, (byte) 1, SlotActionType.THROW, int2ObjectMap, ItemStackHash.EMPTY
         ));
     }
     
@@ -448,7 +454,7 @@ public class BotModeClient implements ClientModInitializer {
             }
             
             if (entity_target != null) {
-                player.lookAt(EntityAnchor.EYES, entity_target.getEntityPos().add(0.0, 1.0, 0.0));
+                player.lookAt(EntityAnchor.EYES, entity_target.getEntityPos().add(0.0, 0.6, 0.0));
                 if (player.getInventory().getSelectedSlot() != 0) {
                     player.getInventory().setSelectedSlot(0);
                     attack_cooldown = 10;
