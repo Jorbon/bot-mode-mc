@@ -71,6 +71,8 @@ public class BotModeClient implements ClientModInitializer {
     public static int attack_cooldown;
     public static final HashMap<BlockPos, Integer> danger_blocks = new HashMap<>();
     
+    public static final int MAX_ATTACK_COOLDOWN = 12;
+    
     @Override
     public void onInitializeClient() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
@@ -247,7 +249,7 @@ public class BotModeClient implements ClientModInitializer {
             // Unreachable, in danger but the danger is nowhere?
         } else {
             player.lookAt(EntityAnchor.FEET, pos.add(v.x, 0.0, v.z));
-            player.input.playerInput = new PlayerInput(true, false, false, false, pos.y < 15.5, false, true);
+            player.input.playerInput = new PlayerInput(true, false, false, false, pos.y < 15.0, false, true);
         }
         
         target_importance = 0;
@@ -376,6 +378,7 @@ public class BotModeClient implements ClientModInitializer {
         }
     }
     
+    
     public static void drop_stack(ClientPlayerEntity player, int slot) {
         var inventory = player.getInventory();
         var item_stack = inventory.getStack(slot);
@@ -394,6 +397,67 @@ public class BotModeClient implements ClientModInitializer {
             0, player.currentScreenHandler.getRevision(), (short) packet_slot, (byte) 1, SlotActionType.THROW, int2ObjectMap, ItemStackHash.EMPTY
         ));
     }
+    
+    
+    public static boolean is_collection_goal(Item item) {
+        return (
+            item == Items.ANCIENT_DEBRIS     || 
+            item == Items.QUARTZ             || 
+            item == Items.BLACKSTONE         || 
+            item == Items.GOLD_NUGGET        || 
+            item == Items.BASALT             || 
+            item == Items.NETHER_BRICKS      || 
+            item == Items.NETHER_BRICK_FENCE || 
+            item == Items.SOUL_SAND          || 
+            item == Items.SOUL_SOIL          || 
+            item == Items.WARPED_STEM        || 
+            item == Items.CRIMSON_STEM       || 
+            item == Items.SHROOMLIGHT
+        );
+    }
+    
+    
+    public static boolean is_junk(Item item) {
+        return (
+            item == Items.NETHERRACK         || 
+            item == Items.GRAVEL             || 
+            item == Items.BONE               || 
+            item == Items.ARROW              || 
+            item == Items.BOW                || 
+            item == Items.LEATHER            || 
+            item == Items.MAGMA_CREAM        || 
+            item == Items.SOUL_TORCH         || 
+            item == Items.CROSSBOW           || 
+            item == Items.WARPED_FENCE       || 
+            item == Items.WARPED_FUNGUS      || 
+            item == Items.WARPED_HYPHAE      || 
+            item == Items.WARPED_NYLIUM      || 
+            item == Items.WARPED_PLANKS      || 
+            item == Items.WARPED_ROOTS       || 
+            item == Items.WARPED_SLAB        || 
+            item == Items.WARPED_STAIRS      || 
+            item == Items.WARPED_WART_BLOCK  || 
+            item == Items.CRIMSON_FENCE      || 
+            item == Items.CRIMSON_FUNGUS     || 
+            item == Items.CRIMSON_HYPHAE     || 
+            item == Items.CRIMSON_NYLIUM     || 
+            item == Items.CRIMSON_PLANKS     || 
+            item == Items.CRIMSON_ROOTS      || 
+            item == Items.CRIMSON_SLAB       || 
+            item == Items.CRIMSON_STAIRS     || 
+            item == Items.NETHER_WART_BLOCK  || 
+            item == Items.GOLDEN_SWORD       || 
+            item == Items.GOLDEN_HELMET      || 
+            item == Items.GOLDEN_CHESTPLATE  || 
+            item == Items.GOLDEN_LEGGINGS    || 
+            item == Items.GOLDEN_BOOTS       || 
+            item == Items.LEATHER_HELMET     || 
+            item == Items.LEATHER_CHESTPLATE || 
+            item == Items.LEATHER_LEGGINGS   || 
+            item == Items.LEATHER_BOOTS
+        );
+    }
+    
     
     
     public static class InteractState {
@@ -430,6 +494,11 @@ public class BotModeClient implements ClientModInitializer {
         if (bot_mode == Mode.END) {
             var pos = player.getEntityPos();
             
+            if (player.getHealth() < 6.0) {
+                bail();
+                return InteractState.NONE;
+            }
+            
             entity_target = null;
             double min_distance = Double.MAX_VALUE;
             for (var entity : world.getEntitiesByType(
@@ -458,7 +527,7 @@ public class BotModeClient implements ClientModInitializer {
                 player.lookAt(EntityAnchor.EYES, entity_target.getEntityPos().add(0.0, 0.6, 0.0));
                 if (player.getInventory().getSelectedSlot() != 0) {
                     player.getInventory().setSelectedSlot(0);
-                    attack_cooldown = 10;
+                    attack_cooldown = MAX_ATTACK_COOLDOWN;
                     
                 } else if (
                     attack_cooldown == 0 && 
@@ -467,7 +536,7 @@ public class BotModeClient implements ClientModInitializer {
                     result.getEntity() instanceof EndermanEntity && 
                     !player.isUsingItem()
                 ) {
-                    attack_cooldown = 10;
+                    attack_cooldown = MAX_ATTACK_COOLDOWN;
                     return InteractState.ATTACKING;
                 }
             }
@@ -532,7 +601,7 @@ public class BotModeClient implements ClientModInitializer {
                 if (inventory.getStack(i).isIn(ItemTags.SWORDS)) {
                     if (inventory.getSelectedSlot() != i) {
                         inventory.setSelectedSlot(i);
-                        attack_cooldown = 10;
+                        attack_cooldown = MAX_ATTACK_COOLDOWN;
                     }
                     break;
                 }
@@ -545,7 +614,7 @@ public class BotModeClient implements ClientModInitializer {
                 result.getEntity() == entity_target && 
                 !player.isUsingItem()
             ) {
-                attack_cooldown = 10;
+                attack_cooldown = MAX_ATTACK_COOLDOWN;
                 target_importance = 0;
                 search_distance = 0;
                 return InteractState.ATTACKING;
@@ -614,31 +683,6 @@ public class BotModeClient implements ClientModInitializer {
         return InteractState.NONE;
     }
     
-    public static boolean is_collection_goal(Item item) {
-        return (
-            item == Items.ANCIENT_DEBRIS || 
-            item == Items.QUARTZ         || 
-            item == Items.BLACKSTONE     || 
-            item == Items.GOLD_NUGGET    || 
-            item == Items.BASALT         || 
-            item == Items.NETHER_BRICKS  || 
-            item == Items.SOUL_SAND      || 
-            item == Items.SOUL_SOIL
-        );
-    }
-    
-    
-    public static boolean is_junk(Item item) {
-        return (
-            item == Items.NETHERRACK   || 
-            item == Items.GRAVEL       || 
-            item == Items.BONE         || 
-            item == Items.ARROW        || 
-            item == Items.BOW          || 
-            item == Items.LEATHER      || 
-            item == Items.GOLDEN_SWORD
-        );
-    }
     
     public static void bot_mode_do_after_interact() {
         var client = MinecraftClient.getInstance();
@@ -703,7 +747,7 @@ public class BotModeClient implements ClientModInitializer {
             )) {
                 var item = item_entity.getStack().getItem();
                 double distance = item_entity.getEntityPos().distanceTo(pos);
-                if ((best == null || best_distance > distance) && is_collection_goal(item)) {
+                if ((best == null || best_distance > distance) && is_collection_goal(item) && (item == Items.ANCIENT_DEBRIS || item_entity.age > 100)) {
                     best = item_entity;
                     best_distance = distance;
                 }
