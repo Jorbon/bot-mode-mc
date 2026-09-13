@@ -72,6 +72,7 @@ public class BotModeClient implements ClientModInitializer {
     public static final HashMap<BlockPos, Integer> danger_blocks = new HashMap<>();
     
     public static final int MAX_ATTACK_COOLDOWN = 12;
+    public static final int ITEM_DESIRABLE_AGE = 60;
     
     @Override
     public void onInitializeClient() {
@@ -412,7 +413,8 @@ public class BotModeClient implements ClientModInitializer {
             item == Items.SOUL_SOIL          || 
             item == Items.WARPED_STEM        || 
             item == Items.CRIMSON_STEM       || 
-            item == Items.SHROOMLIGHT
+            item == Items.SHROOMLIGHT        || 
+            item == Items.BONE_BLOCK
         );
     }
     
@@ -425,6 +427,7 @@ public class BotModeClient implements ClientModInitializer {
             item == Items.ARROW              || 
             item == Items.BOW                || 
             item == Items.LEATHER            || 
+            item == Items.ROTTEN_FLESH       || 
             item == Items.MAGMA_CREAM        || 
             item == Items.SOUL_TORCH         || 
             item == Items.CROSSBOW           || 
@@ -747,7 +750,7 @@ public class BotModeClient implements ClientModInitializer {
             )) {
                 var item = item_entity.getStack().getItem();
                 double distance = item_entity.getEntityPos().distanceTo(pos);
-                if ((best == null || best_distance > distance) && is_collection_goal(item) && (item == Items.ANCIENT_DEBRIS || item_entity.age > 100)) {
+                if ((best == null || best_distance > distance) && is_collection_goal(item) && (item == Items.ANCIENT_DEBRIS || item_entity.age > ITEM_DESIRABLE_AGE)) {
                     best = item_entity;
                     best_distance = distance;
                 }
